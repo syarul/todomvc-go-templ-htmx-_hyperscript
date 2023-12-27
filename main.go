@@ -223,7 +223,6 @@ func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if index != -1 {
-
 		(*t)[index].title = title
 		(*t)[index].editing = true
 		// the trick is to only target the input element,
