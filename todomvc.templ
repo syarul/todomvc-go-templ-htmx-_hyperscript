@@ -1,0 +1,253 @@
+package main
+
+import (
+  "fmt"
+  "strconv" 
+)
+
+templ toggleAll(checked bool) {
+  <input id="toggle-all" class="toggle-all" type="checkbox"
+    defaultChecked?={ checked }
+    _="
+      on load set $toggleAll to me
+      on toggleAll debounced at 100ms
+        fetch /toggle-all then
+        if it === 'true' and my.checked === false then
+          set my.checked to true
+        else
+          if my.checked === true and it === 'false' then set my.checked to false
+        end
+      end
+      on click send toggle to <input.toggle/>"
+  />
+}
+
+templ filter(filters []Filter) {
+  <ul class="filters">
+    for _, filter := range filters {
+      <li>
+        <a class={ templ.KV("selected", filter.selected)  } href={ templ.SafeURL(filter.url) }
+          hx-get={ fmt.Sprintf("/todo-filter?name=%s", filter.name) }
+          hx-trigger="click"
+          hx-target=".filters"
+          hx-swap="outerHTML"
+          _="on htmx:afterRequest send show to <li.todo/>"
+        >
+          { filter.name }
+        </a>
+      </li>
+    }
+  </ul>
+}
+
+templ todoCheck(todo Todo) {
+  <input
+    class="toggle"
+    type="checkbox"
+    checked?={ todo.done }
+    hx-patch={ fmt.Sprintf(`/toggle-todo?id=%s&done=%s`, todo.id, strconv.FormatBool(todo.done)) }
+    hx-target="closest <li/>"
+    hx-swap="outerHTML"
+    _="
+      on toggle
+        if $toggleAll.checked and my.checked === false
+          my.click()
+        else if $toggleAll.checked === false and my.checked
+          my.click()"
+  />
+}
+
+templ editTodo(todo Todo) {
+  <input
+    class="edit"
+    name="title"
+    if todo.editing {
+      value={ todo.title }
+    } else {
+      value=""
+    }
+    hx-trigger="keyup[keyCode==13], title"
+    hx-get={ fmt.Sprintf(`/update-todo?id=%s`, todo.id) }
+    hx-target="closest <li/>"
+    hx-swap="outerHTML"
+    autoFocus
+    _="
+      on keyup[keyCode==27] remove .editing from closest <li/>
+      on htmx:afterRequest send focus to <input.new-todo/>"
+  />
+}
+
+templ todoItem(todo Todo) {
+  <li id={ todo.id }
+    class={ "todo", templ.KV("completed", todo.done), templ.KV("editing", todo.editing) }
+    _="
+      on destroy my.querySelector('button').click()
+      on show wait 20ms
+        if window.location.hash === '#/active' and my.classList.contains('completed')
+          set my.style.display to 'none'
+        else if window.location.hash === '#/completed' and my.classList.contains('completed') === false
+          set my.style.display to 'none'
+        else
+          set my.style.display to 'block'"
+  >
+    <div class="view">
+      @todoCheck(todo)
+      <label
+        hx-trigger="dblclick"
+        hx-patch={ fmt.Sprintf(`/edit-todo?id=%s&title=%s`, todo.id, todo.title) }
+        hx-target="next input"
+        hx-swap="outerHTML"
+        _="
+          on dblclick add .editing to the closest <li/>
+          on htmx:afterRequest
+            set $el to my.parentNode.nextSibling
+            set $el.selectionStart to $el.value.length"
+      >
+        { todo.title }
+      </label>
+      <button
+        class="destroy"
+        hx-delete={ fmt.Sprintf(`/remove-todo?id=%s`, todo.id) }
+        hx-trigger="click"
+        hx-target="closest <li/>"
+        _="
+          on htmx:afterRequest 
+            send toggleDisplayClearCompleted to <button.clear-completed/>
+            send todoCount to <span.todo-count/>
+            send toggleAll to <input.toggle-all/>
+            send footerToggleDisplay to <footer.footer/>
+            send labelToggleAll to <label/>
+            send focus to <input.new-todo/>"
+      />
+    </div>
+    @editTodo(todo)
+  </li>
+}
+
+templ Page(todos []Todo, filters []Filter, checked bool) {
+  <html lang="en" data-framework="htmx">
+    <head>
+      <meta charSet="utf-8" />
+      <title>HTMX • TodoMVC</title>
+      <link rel="stylesheet" href="https://unpkg.com/todomvc-common@1.0.5/base.css" type="text/css" />
+      <link rel="stylesheet" href="https://unpkg.com/todomvc-app-css/index.css" type="text/css" />
+    </head>
+		<body>
+      <section
+        class="todoapp"
+        hx-get="/get-hash"
+        hx-vals="js:{hash: window.location.hash}"
+        hx-trigger="load"
+        hx-target=".filters"
+        hx-swap="outerHTML"
+      >
+        <header class="header">
+          <h1>todos</h1>
+          <input
+            id="add-todo"
+            name="title"
+            class="new-todo"
+            placeholder="What needs to be done?"
+            hx-get="/add-todo"
+            hx-trigger="keyup[keyCode==13], title"
+            hx-target=".todo-list"
+            hx-swap="beforeend"
+            _="
+              on htmx:afterRequest set my value to ''
+              on focus my.focus()"
+            autoFocus />
+        </header>
+        <section class="main">
+          @toggleAll(checked)
+          <label 
+            for="toggle-all"
+            _="
+              on load send labelToggleAll to me
+              on labelToggleAll debounced at 100ms
+                if $todo.hasChildNodes() set my.style.display to 'flex'
+                else set my.style.display to 'none'"
+            style="display:none;"
+            >
+            Mark all as complete
+          </label>
+        </section>
+        <ul
+          class="todo-list"
+          _="
+            on load debounced at 10ms 
+              set $todo to me
+              send toggleDisplayClearCompleted to <button.clear-completed/>
+              send footerToggleDisplay to <footer.footer/>
+              send todoCount to <span.todo-count/>
+              send toggleAll to <input.toggle-all/>
+              send footerToggleDisplay to <footer.footer/>
+              send labelToggleAll to <label/>
+              send show to <li.todo/>"
+        >
+          for _, todo := range todos {
+            @todoItem(todo)
+          }
+        </ul>
+        <footer 
+          class="footer"
+          _="
+            on load send footerToggleDisplay to me
+            on footerToggleDisplay debounced at 100ms
+              if $todo.hasChildNodes() set my.style.display to 'block'
+              else set my.style.display to 'none'
+              send focus to <input.new-todo/>"
+          style="display:none;" 
+        >
+          <span
+            class="todo-count"
+            hx-trigger="load"
+            _="
+              on load send todoCount to me
+              on todoCount debounced at 100ms
+                fetch /update-counts then put the result into me"
+          />
+          @filter(filters)
+          <button class="clear-completed"
+            _="
+              on load send toggleDisplayClearCompleted to me
+              on toggleDisplayClearCompleted debounced at 100ms
+                fetch /completed then
+                set my.style.display to it
+              end
+              on click send destroy to <li.completed/>"
+          >Clear Complete</button>
+        </footer>
+      </section>
+      <footer class="info" _="on load debounced at 100ms call startMeUp()">
+        <p>Double-click to edit a todo</p>
+        <p>Created by <a href="http://github.com/syarul/">syarul</a></p>
+        <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+        <img src="https://htmx.org/img/createdwith.jpeg" width="250" height="auto" />
+      </footer>
+		</body>
+    <script src="https://unpkg.com/todomvc-common@1.0.5/base.js" />
+    <script src="https://unpkg.com/htmx.org@1.9.10" />
+    <script src="https://unpkg.com/hyperscript.org/dist/_hyperscript.js" />
+    <script type="text/hyperscript">
+      def startMeUp()
+        log "
+     ooooo   ooooo ooooooooooooo ooo        ooooo ooooooo  ooooo 
+     `888'   `888' 8'   888   `8 `88.       .888'  `8888    d8'  
+      888     888       888       888b     d'888     Y888..8P    
+      888ooooo888       888       8 Y88. .P  888      `8888'     
+      888     888       888       8  `888'   888     .8PY888.    
+      888     888       888       8    Y     888    d8'  `888b   
+     o888o   o888o     o888o     o8o        o888o o888o  o88888o
+    ===========================================================
+            Build with GO, TEMPL, HTMX & _HYPERSCRIPT
+   _   _                 _       _     _                         
+  | |_| |__   ___   _ __(_) __ _| |__ | |_  __      ____ _ _   _ 
+  | __| '_ \\ / _ \\ | '__| |/ _\` | '_ \\| __| \\ \\ /\\ / / _\` | | | |
+  | |_| | | |  __/ | |  | | (_| | | | | |_   \\ V  V / (_| | |_| |
+   \\__|_| |_|\\___| |_|  |_|\\__, |_| |_|\\__|   \\_/\\_/ \\__,_|\\__, |
+                           |___/                           |___/ 
+                  by http://github.com/syarul/"
+      end
+    </script>
+	</html>
+}
