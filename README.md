@@ -8,4 +8,4 @@ TodoMVC app build with Go </>TEMPL HTMX & _HYPERSCRIPT
 - install templ `go install github.com/a-h/templ/cmd/templ@latest`
 - run `templ generate`
 - finally run `go run .`
-- alternatively you can compile into executable with go build .
+- alternatively you can compile into executable with `go build .`
