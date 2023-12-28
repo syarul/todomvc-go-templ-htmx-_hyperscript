@@ -24,10 +24,55 @@ type Filter struct {
 	selected bool
 }
 
+// enum
+type Action int
+
+// group action related constants in one type
+const (
+	Create Action = 0
+	Toggle Action = 1
+	Edit   Action = 2
+	Update Action = 3
+	Delete Action = 4
+)
+
 var filters = []Filter{
 	{url: "#/", name: "all", selected: true},
 	{url: "#/active", name: "active", selected: false},
 	{url: "#/completed", name: "completed", selected: false},
+}
+
+func (t *todos) crudOps(action Action, id string, title string, done bool, editing bool) Todo {
+	index := -1
+	if action != Create {
+		for i, todo := range *t {
+			if todo.id == id {
+				index = i
+				break
+			}
+		}
+	}
+	switch action {
+	case Toggle:
+		(*t)[index].done = done
+	case Edit:
+		(*t)[index].editing = editing
+	case Update:
+		(*t)[index].title = title
+		(*t)[index].editing = false
+	case Delete:
+		*t = append((*t)[:index], (*t)[index+1:]...)
+		return Todo{}
+	default:
+		// default to Create action
+		newTodo := Todo{id, title, done, editing}
+		*t = append(*t, newTodo)
+		return newTodo
+	}
+	if index != -1 {
+		return (*t)[index]
+	}
+	return Todo{}
 }
 
 func main() {
@@ -121,18 +166,17 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	title := r.FormValue("title")
 
-	randId := uuid.New().String()
-
-	newTodo := Todo{
-		id:      randId,
-		title:   title,
-		done:    false,
-		editing: false,
+	// ignore adding if title is empty
+	if len(title) == 0 {
+		w.Write([]byte(""))
+		return
 	}
 
-	*t = append(*t, newTodo)
+	id := uuid.New().String()
 
-	component := todoItem(newTodo)
+	todo := t.crudOps(Create, id, title, false, false)
+
+	component := todoItem(todo)
 	component.Render(r.Context(), w)
 }
 
@@ -186,70 +230,30 @@ func (t *todos) toggleAllHandler(w http.ResponseWriter, r *http.Request) {
 func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	id := r.FormValue("id")
-	done := r.FormValue("done")
 
-	index := -1
-	for i, todo := range *t {
-		if todo.id == id {
-			index = i
-			break
-		}
+	done, err := strconv.ParseBool(r.FormValue("done"))
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
 	}
 
-	// If the todo is found, update its done status
-	if index != -1 {
-		if done == "true" {
-			(*t)[index].done = false
-		} else {
-			(*t)[index].done = true
-		}
-		// render the new todo
-		component := todoItem((*t)[index])
-		component.Render(r.Context(), w)
-	}
+	todo := t.crudOps(Toggle, id, "", !done, false)
+
+	component := todoItem(todo)
+	component.Render(r.Context(), w)
 }
 
 func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	id := r.FormValue("id")
-	title := r.FormValue("title")
 
-	index := -1
-	for i, todo := range *t {
-		if todo.id == id {
-			index = i
-			break
-		}
-	}
-
-	if index != -1 {
-		(*t)[index].title = title
-		(*t)[index].editing = true
-		// the trick is to only target the input element,
-		// since there's bunch _hyperscript scope events happening here
-		// we don't want to swap and loose the selectors.
-		// Could also move it to the parentNode
-		component := editTodo((*t)[index])
-		component.Render(r.Context(), w)
-	}
-}
-
-func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
-
-	index := -1
-	for i, todo := range *t {
-		if todo.id == id {
-			index = i
-			break
-		}
-	}
-
-	if index != -1 {
-		*t = append((*t)[:index], (*t)[index+1:]...)
-	}
-
-	w.Write([]byte(""))
+	// the trick is to only target the input element,
+	// since there's bunch _hyperscript scope events happening here
+	// we don't want to swap and loose the selectors.
+	// Could also move it to the parentNode
+	todo := t.crudOps(Edit, id, "", false, true)
+	component := editTodo(todo)
+	component.Render(r.Context(), w)
 }
 
 func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
@@ -257,21 +261,15 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	title := r.FormValue("title")
 
-	index := -1
-	for i, todo := range *t {
-		if todo.id == id {
-			index = i
-			break
-		}
-	}
+	todo := t.crudOps(Update, id, title, false, false)
+	component := todoItem(todo)
+	component.Render(r.Context(), w)
+}
 
-	// If the todo is found, update its title, editing
-	if index != -1 {
-		(*t)[index].title = title
-		(*t)[index].editing = false
+func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
 
-		// generate new todo templ
-		component := todoItem((*t)[index])
-		component.Render(r.Context(), w)
-	}
+	t.crudOps(Delete, id, "", false, false)
+
+	w.Write([]byte(""))
 }

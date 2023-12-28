@@ -94,7 +94,7 @@ templ todoItem(todo Todo) {
       @todoCheck(todo)
       <label
         hx-trigger="dblclick"
-        hx-patch={ fmt.Sprintf(`/edit-todo?id=%s&title=%s`, todo.id, todo.title) }
+        hx-patch={ fmt.Sprintf(`/edit-todo?id=%s`, todo.id) }
         hx-target="next input"
         hx-swap="outerHTML"
         _="
