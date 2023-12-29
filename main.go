@@ -42,11 +42,11 @@ var filters = []Filter{
 	{url: "#/completed", name: "completed", selected: false},
 }
 
-func (t *todos) crudOps(action Action, id string, title string, done bool, editing bool) Todo {
+func (t *todos) crudOps(action Action, todo Todo) Todo {
 	index := -1
 	if action != Create {
-		for i, todo := range *t {
-			if todo.id == id {
+		for i, r := range *t {
+			if r.id == todo.id {
 				index = i
 				break
 			}
@@ -54,22 +54,20 @@ func (t *todos) crudOps(action Action, id string, title string, done bool, editi
 	}
 	switch action {
 	case Toggle:
-		(*t)[index].done = done
+		(*t)[index].done = todo.done
 	case Edit:
-		(*t)[index].editing = editing
+		(*t)[index].editing = todo.editing
 	case Update:
-		(*t)[index].title = title
+		(*t)[index].title = todo.title
 		(*t)[index].editing = false
 	case Delete:
 		*t = append((*t)[:index], (*t)[index+1:]...)
-		return Todo{}
 	default:
 		// default to Create action
-		newTodo := Todo{id, title, done, editing}
-		*t = append(*t, newTodo)
-		return newTodo
+		*t = append(*t, todo)
+		return todo
 	}
-	if index != -1 {
+	if index != -1 && action != Delete {
 		return (*t)[index]
 	}
 	return Todo{}
@@ -105,34 +103,6 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 
-func learnHandler(w http.ResponseWriter, r *http.Request) {
-	// Set the Content-Type header to indicate JSON
-	w.Header().Set("Content-Type", "application/json")
-
-	// Create an empty JSON object and write it to the response
-	emptyJSON := map[string]interface{}{} // an empty JSON object
-	json.NewEncoder(w).Encode(emptyJSON)
-}
-
-func todoFilter(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	name := r.FormValue("name")
-
-	// Loop through filters and update the selected field
-	for i := range filters {
-		if filters[i].name == name {
-			filters[i].selected = true
-		} else {
-			filters[i].selected = false
-		}
-	}
-
-	// Now 'filters' has been updated based on the selected filter name
-	// You can use the updated filters as needed
-	component := filter(filters)
-	component.Render(r.Context(), w)
-}
-
 // countNotDone returns the count of todos that are not done
 func countNotDone(todos []Todo) int {
 	count := 0
@@ -156,6 +126,42 @@ func defChecked(todos []Todo) bool {
 	return defaultChecked
 }
 
+// hasIncompleteTask checks if there is any incomplete task in the Todos slice
+func hasIncompleteTask(todos []Todo) bool {
+	for _, todo := range todos {
+		if todo.done {
+			return true
+		}
+	}
+	return false
+}
+
+func learnHandler(w http.ResponseWriter, r *http.Request) {
+	// Set the Content-Type header to indicate JSON
+	w.Header().Set("Content-Type", "application/json")
+
+	// Create an empty JSON object and write it to the response
+	emptyJSON := map[string]interface{}{} // an empty JSON object
+	json.NewEncoder(w).Encode(emptyJSON)
+}
+
+func todoFilter(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	name := r.FormValue("name")
+
+	// Loop through filters and update the selected field
+	for i := range filters {
+		if filters[i].name == name {
+			filters[i].selected = true
+		} else {
+			filters[i].selected = false
+		}
+	}
+
+	component := filter(filters)
+	component.Render(r.Context(), w)
+}
+
 func (t *todos) pageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	component := Page(*t, filters, defChecked(*t))
@@ -174,7 +180,7 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := uuid.New().String()
 
-	todo := t.crudOps(Create, id, title, false, false)
+	todo := t.crudOps(Create, Todo{id, title, false, false})
 
 	component := todoItem(todo)
 	component.Render(r.Context(), w)
@@ -183,16 +189,6 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 func getHash(w http.ResponseWriter, r *http.Request) {
 	component := filter(filters)
 	component.Render(r.Context(), w)
-}
-
-// hasIncompleteTask checks if there is any incomplete task in the Todos slice
-func hasIncompleteTask(todos []Todo) bool {
-	for _, todo := range todos {
-		if todo.done {
-			return true
-		}
-	}
-	return false
 }
 
 func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +233,7 @@ func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo := t.crudOps(Toggle, id, "", !done, false)
+	todo := t.crudOps(Toggle, Todo{id, "", !done, false})
 
 	component := todoItem(todo)
 	component.Render(r.Context(), w)
@@ -251,7 +247,7 @@ func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 	// since there's bunch _hyperscript scope events happening here
 	// we don't want to swap and loose the selectors.
 	// Could also move it to the parentNode
-	todo := t.crudOps(Edit, id, "", false, true)
+	todo := t.crudOps(Edit, Todo{id, "", false, true})
 	component := editTodo(todo)
 	component.Render(r.Context(), w)
 }
@@ -261,7 +257,7 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	title := r.FormValue("title")
 
-	todo := t.crudOps(Update, id, title, false, false)
+	todo := t.crudOps(Update, Todo{id, title, false, false})
 	component := todoItem(todo)
 	component.Render(r.Context(), w)
 }
@@ -269,7 +265,7 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 
-	t.crudOps(Delete, id, "", false, false)
+	t.crudOps(Delete, Todo{id, "", false, false})
 
 	w.Write([]byte(""))
 }
