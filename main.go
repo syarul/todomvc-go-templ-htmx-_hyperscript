@@ -245,7 +245,7 @@ func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 	// since editing only client side changes
 	todo := t.crudOps(Edit, Todo{id, "", false, false})
 
-	templRenderer(w, r, editTodo(Todo{id, todo.title, false, true}))
+	templRenderer(w, r, editTodo(Todo{id, todo.title, todo.done, true}))
 }
 
 func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
