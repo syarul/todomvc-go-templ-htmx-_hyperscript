@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/a-h/templ"
 	"github.com/google/uuid"
 )
 
@@ -53,19 +54,18 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 		}
 	}
 	switch action {
+	case Create:
+		*t = append(*t, todo)
+		return todo
 	case Toggle:
 		(*t)[index].done = todo.done
-	case Edit:
-		(*t)[index].editing = todo.editing
 	case Update:
 		(*t)[index].title = todo.title
 		(*t)[index].editing = false
 	case Delete:
 		*t = append((*t)[:index], (*t)[index+1:]...)
 	default:
-		// default to Create action
-		*t = append(*t, todo)
-		return todo
+		// Edit should do nothing only return todo from store
 	}
 	if index != -1 && action != Delete {
 		return (*t)[index]
@@ -73,32 +73,27 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 	return Todo{}
 }
 
+// main is the entry point of the application.
 func main() {
 	t := &todos{}
 
+	// Register the routes.
 	http.Handle("/get-hash", http.HandlerFunc(getHash))
 	http.Handle("/learn.json", http.HandlerFunc(learnHandler))
 
-	http.Handle("/todo-filter", http.HandlerFunc(todoFilter))
+	http.Handle("/update-counts", http.HandlerFunc(t.updateCounts))
+	http.Handle("/toggle-all", http.HandlerFunc(t.toggleAllHandler))
+	http.Handle("/completed", http.HandlerFunc(t.clearCompleted))
 
 	http.Handle("/", http.HandlerFunc(t.pageHandler))
 
 	http.Handle("/add-todo", http.HandlerFunc(t.addTodoHandler))
-
-	http.Handle("/completed", http.HandlerFunc(t.clearCompleted))
-
-	http.Handle("/update-counts", http.HandlerFunc(t.updateCounts))
-
-	http.Handle("/toggle-all", http.HandlerFunc(t.toggleAllHandler))
-
 	http.Handle("/toggle-todo", http.HandlerFunc(t.toggleTodo))
-
 	http.Handle("/edit-todo", http.HandlerFunc(t.editTodoHandler))
-
+	http.Handle("/update-todo", http.HandlerFunc(t.updateTodo))
 	http.Handle("/remove-todo", http.HandlerFunc(t.removeTodo))
 
-	http.Handle("/update-todo", http.HandlerFunc(t.updateTodo))
-
+	// Start the server.
 	fmt.Println("Listening on :8080")
 	http.ListenAndServe(":8080", nil)
 }
@@ -136,6 +131,18 @@ func hasIncompleteTask(todos []Todo) bool {
 	return false
 }
 
+// templRenderer sets the common headers and renders the given component.
+func templRenderer(w http.ResponseWriter, r *http.Request, component templ.Component) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	component.Render(r.Context(), w)
+}
+
+// byteRenderer writes the given value as a response with the Content-Type header set to text/html; charset=utf-8.
+func byteRenderer[V string](w http.ResponseWriter, r *http.Request, value V) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(value))
+}
+
 func learnHandler(w http.ResponseWriter, r *http.Request) {
 	// Set the Content-Type header to indicate JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -145,36 +152,36 @@ func learnHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(emptyJSON)
 }
 
-func todoFilter(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+// getHash handles the GET request for the #/:name route.
+// It updates the selected field of each filter based on the name query parameter.
+func getHash(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 
-	// Loop through filters and update the selected field
-	for i := range filters {
-		if filters[i].name == name {
-			filters[i].selected = true
-		} else {
-			filters[i].selected = false
+	if name != "" {
+		// Loop through filters and update the selected field
+		for i := range filters {
+			if filters[i].name == name {
+				filters[i].selected = true
+			} else {
+				filters[i].selected = false
+			}
 		}
 	}
 
-	component := filter(filters)
-	component.Render(r.Context(), w)
+	// Render the filter component with the updated filters
+	templRenderer(w, r, filter(filters))
 }
 
 func (t *todos) pageHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	component := Page(*t, filters, defChecked(*t))
-	component.Render(r.Context(), w)
+	templRenderer(w, r, Page(*t, filters, defChecked(*t)))
 }
 
 func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	title := r.FormValue("title")
 
 	// ignore adding if title is empty
 	if len(title) == 0 {
-		w.Write([]byte(""))
+		byteRenderer(w, r, "")
 		return
 	}
 
@@ -182,13 +189,7 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	todo := t.crudOps(Create, Todo{id, title, false, false})
 
-	component := todoItem(todo)
-	component.Render(r.Context(), w)
-}
-
-func getHash(w http.ResponseWriter, r *http.Request) {
-	component := filter(filters)
-	component.Render(r.Context(), w)
+	templRenderer(w, r, todoItem(todo))
 }
 
 func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
@@ -199,20 +200,17 @@ func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Write the string directly to the response
-	w.Write([]byte(displayStyle))
+	byteRenderer(w, r, displayStyle)
 }
 
 func (t *todos) updateCounts(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	uncompletedCount := countNotDone(*t)
 	plural := ""
 	if uncompletedCount != 1 {
 		plural = "s"
 	}
-	countString := fmt.Sprintf("<strong>%d</strong>", uncompletedCount)
-	responseString := fmt.Sprintf("item%s left", plural)
 
-	w.Write([]byte(countString + " " + responseString))
+	byteRenderer(w, r, fmt.Sprintf("<strong>%d</strong> item%s left", uncompletedCount, plural))
 }
 
 func (t *todos) toggleAllHandler(w http.ResponseWriter, r *http.Request) {
@@ -220,11 +218,10 @@ func (t *todos) toggleAllHandler(w http.ResponseWriter, r *http.Request) {
 	checked := defChecked(*t)
 
 	// Render the template or send the value to the client as needed
-	w.Write([]byte(strconv.FormatBool(checked)))
+	byteRenderer(w, r, strconv.FormatBool(checked))
 }
 
 func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	id := r.FormValue("id")
 
 	done, err := strconv.ParseBool(r.FormValue("done"))
@@ -235,31 +232,29 @@ func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
 
 	todo := t.crudOps(Toggle, Todo{id, "", !done, false})
 
-	component := todoItem(todo)
-	component.Render(r.Context(), w)
+	templRenderer(w, r, todoItem(todo))
 }
 
 func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	id := r.FormValue("id")
 
 	// the trick is to only target the input element,
 	// since there's bunch _hyperscript scope events happening here
 	// we don't want to swap and loose the selectors.
-	// Could also move it to the parentNode
-	todo := t.crudOps(Edit, Todo{id, "", false, true})
-	component := editTodo(todo)
-	component.Render(r.Context(), w)
+	// we also don't want to do any crud operations
+	// since editing only client side changes
+	todo := t.crudOps(Edit, Todo{id, "", false, false})
+
+	templRenderer(w, r, editTodo(Todo{id, todo.title, false, true}))
 }
 
 func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	id := r.FormValue("id")
 	title := r.FormValue("title")
 
 	todo := t.crudOps(Update, Todo{id, title, false, false})
-	component := todoItem(todo)
-	component.Render(r.Context(), w)
+
+	templRenderer(w, r, todoItem(todo))
 }
 
 func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
@@ -267,5 +262,5 @@ func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
 
 	t.crudOps(Delete, Todo{id, "", false, false})
 
-	w.Write([]byte(""))
+	byteRenderer(w, r, "")
 }

@@ -27,7 +27,7 @@ templ filter(filters []Filter) {
     for _, filter := range filters {
       <li>
         <a class={ templ.KV("selected", filter.selected)  } href={ templ.SafeURL(filter.url) }
-          hx-get={ fmt.Sprintf("/todo-filter?name=%s", filter.name) }
+          hx-get={ fmt.Sprintf("/get-hash?name=%s", filter.name) }
           hx-trigger="click"
           hx-target=".filters"
           hx-swap="outerHTML"
