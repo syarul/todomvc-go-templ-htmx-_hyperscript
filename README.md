@@ -8,7 +8,7 @@
      o888o   o888o     o888o     o8o        o888o o888o  o88888o
     ===========================================================
             Build with GO, TEMPL, HTMX & _HYPERSCRIPT
-
+[![Go](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml/badge.svg)](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml)
 ### Usage
 - install go if you don't have
 - run `go mod tidy` to fetch all needed modules
