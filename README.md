@@ -16,3 +16,6 @@
 - run `templ generate`
 - finally run `go run .`
 - alternatively you can compile into executable with `go build .`
+
+### HTMX
+Visit [https://github.com/rajasegar/awesome-htmx](https://github.com/rajasegar/awesome-htmx) to look for HTMX curated infos
