@@ -60,12 +60,14 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 	case Toggle:
 		(*t)[index].done = todo.done
 	case Update:
-		(*t)[index].title = todo.title
+		if len(todo.title) != 0 {
+			(*t)[index].title = todo.title
+		}
 		(*t)[index].editing = false
 	case Delete:
 		*t = append((*t)[:index], (*t)[index+1:]...)
 	default:
-		// Edit should do nothing only return todo from store
+		// edit should do nothing only return todo from store
 	}
 	if index != -1 && action != Delete {
 		return (*t)[index]
@@ -93,7 +95,7 @@ func main() {
 	http.Handle("/update-todo", http.HandlerFunc(t.updateTodo))
 	http.Handle("/remove-todo", http.HandlerFunc(t.removeTodo))
 
-	// Start the server.
+	// start the server.
 	fmt.Println("Listening on :8080")
 	http.ListenAndServe(":8080", nil)
 }
@@ -110,10 +112,10 @@ func countNotDone(todos []Todo) int {
 }
 
 func defChecked(todos []Todo) bool {
-	// Count the number of uncompleted tasks
+	// count the number of uncompleted tasks
 	uncompletedCount := countNotDone(todos)
 
-	// Determine the defaultChecked value
+	// determine the defaultChecked value
 	defaultChecked := false
 	if uncompletedCount == 0 && len(todos) > 0 {
 		defaultChecked = true
@@ -121,8 +123,8 @@ func defChecked(todos []Todo) bool {
 	return defaultChecked
 }
 
-// hasIncompleteTask checks if there is any incomplete task in the Todos slice
-func hasIncompleteTask(todos []Todo) bool {
+// has completeTask checks if there is any completed task in the Todos slice
+func hasCompleteTask(todos []Todo) bool {
 	for _, todo := range todos {
 		if todo.done {
 			return true
@@ -144,21 +146,21 @@ func byteRenderer[V string](w http.ResponseWriter, r *http.Request, value V) {
 }
 
 func learnHandler(w http.ResponseWriter, r *http.Request) {
-	// Set the Content-Type header to indicate JSON
+	// set the Content-Type header to indicate JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	// Create an empty JSON object and write it to the response
+	// create an empty JSON object and write it to the response
 	emptyJSON := map[string]interface{}{} // an empty JSON object
 	json.NewEncoder(w).Encode(emptyJSON)
 }
 
 // getHash handles the GET request for the #/:name route.
-// It updates the selected field of each filter based on the name query parameter.
+// it updates the selected field of each filter based on the name query parameter.
 func getHash(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 
 	if name != "" {
-		// Loop through filters and update the selected field
+		// loop through filters and update the selected field
 		for i := range filters {
 			if filters[i].name == name {
 				filters[i].selected = true
@@ -168,7 +170,7 @@ func getHash(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Render the filter component with the updated filters
+	// render the filter component with the updated filters
 	templRenderer(w, r, filter(filters))
 }
 
@@ -193,13 +195,13 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
-	// Determine render "none" or "block" based on incomplete tasks
+	// determine render "none" or "block" based on incomplete tasks
 	displayStyle := "none"
-	if hasIncompleteTask(*t) {
+	if hasCompleteTask(*t) {
 		displayStyle = "block"
 	}
 
-	// Write the string directly to the response
+	// write the string directly to the response
 	byteRenderer(w, r, displayStyle)
 }
 
@@ -214,10 +216,10 @@ func (t *todos) updateCounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) toggleAllHandler(w http.ResponseWriter, r *http.Request) {
-	// Count the number of uncompleted tasks
+	// count the number of uncompleted tasks
 	checked := defChecked(*t)
 
-	// Render the template or send the value to the client as needed
+	// render the template or send the value to the client as needed
 	byteRenderer(w, r, strconv.FormatBool(checked))
 }
 

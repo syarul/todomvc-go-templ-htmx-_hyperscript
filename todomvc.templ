@@ -70,7 +70,7 @@ templ editTodo(todo Todo) {
     hx-get={ fmt.Sprintf(`/update-todo?id=%s`, todo.id) }
     hx-target="closest <li/>"
     hx-swap="outerHTML"
-    autoFocus
+    autofocus
     _="
       on keyup[keyCode==27] remove .editing from closest <li/>
       on htmx:afterRequest send focus to <input.new-todo/>"
@@ -155,7 +155,7 @@ templ Page(todos []Todo, filters []Filter, checked bool) {
             _="
               on htmx:afterRequest set my value to ''
               on focus my.focus()"
-            autoFocus />
+            autofocus />
         </header>
         <section class="main">
           @toggleAll(checked)
