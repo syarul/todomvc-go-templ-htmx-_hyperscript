@@ -24,7 +24,10 @@ jobs:
         run: go mod tidy
 
       - name: Generate code
-        run: templ generate
+        run: |
+          go get -u github.com/a-h/templ/cmd/templ@latest
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ generate
 
       - name: Build
         run: go build .
