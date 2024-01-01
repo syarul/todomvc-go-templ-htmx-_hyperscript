@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
-	"github.com/google/uuid"
 )
 
+var idCounter uint64
+
 type Todo struct {
-	id      string
+	id      uint64
 	title   string
 	done    bool
 	editing bool
@@ -60,10 +62,15 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 	case Toggle:
 		(*t)[index].done = todo.done
 	case Update:
-		if len(todo.title) != 0 {
-			(*t)[index].title = todo.title
+		title := strings.Trim(todo.title, " ")
+		if len(title) != 0 {
+			(*t)[index].title = title
+			(*t)[index].editing = false
+		} else {
+			// remove if title is empty
+			*t = append((*t)[:index], (*t)[index+1:]...)
+			return Todo{}
 		}
-		(*t)[index].editing = false
 	case Delete:
 		*t = append((*t)[:index], (*t)[index+1:]...)
 	default:
@@ -158,15 +165,21 @@ func learnHandler(w http.ResponseWriter, r *http.Request) {
 // it updates the selected field of each filter based on the name query parameter.
 func getHash(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
+	hash := r.FormValue("hash")
 
-	if name != "" {
-		// loop through filters and update the selected field
-		for i := range filters {
-			if filters[i].name == name {
-				filters[i].selected = true
-			} else {
-				filters[i].selected = false
-			}
+	if len(name) == 0 {
+		if len(hash) != 0 {
+			name = hash
+		} else {
+			name = "all"
+		}
+	}
+	// loop through filters and update the selected field
+	for i := range filters {
+		if filters[i].name == name {
+			filters[i].selected = true
+		} else {
+			filters[i].selected = false
 		}
 	}
 
@@ -179,15 +192,15 @@ func (t *todos) pageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.FormValue("title")
-
+	title := strings.Trim(r.FormValue("title"), " ")
 	// ignore adding if title is empty
 	if len(title) == 0 {
 		byteRenderer(w, r, "")
 		return
 	}
 
-	id := uuid.New().String()
+	idCounter++
+	id := idCounter
 
 	todo := t.crudOps(Create, Todo{id, title, false, false})
 
@@ -224,7 +237,12 @@ func (t *todos) toggleAllHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	id, err := strconv.ParseUint(r.FormValue("id"), 0, 32)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 
 	done, err := strconv.ParseBool(r.FormValue("done"))
 	if err != nil {
@@ -238,7 +256,12 @@ func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	id, err := strconv.ParseUint(r.FormValue("id"), 0, 32)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 
 	// the trick is to only target the input element,
 	// since there's bunch _hyperscript scope events happening here
@@ -251,16 +274,32 @@ func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	id, err := strconv.ParseUint(r.FormValue("id"), 0, 32)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
 	title := r.FormValue("title")
 
 	todo := t.crudOps(Update, Todo{id, title, false, false})
+
+	if len(todo.title) == 0 {
+		byteRenderer(w, r, "")
+		return
+	}
 
 	templRenderer(w, r, todoItem(todo))
 }
 
 func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	id, err := strconv.ParseUint(r.FormValue("id"), 0, 32)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 
 	t.crudOps(Delete, Todo{id, "", false, false})
 

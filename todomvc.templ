@@ -45,7 +45,7 @@ templ todoCheck(todo Todo) {
     class="toggle"
     type="checkbox"
     checked?={ todo.done }
-    hx-patch={ fmt.Sprintf(`/toggle-todo?id=%s&done=%s`, todo.id, strconv.FormatBool(todo.done)) }
+    hx-patch={ fmt.Sprintf(`/toggle-todo?id=%s&done=%s`, strconv.FormatUint(todo.id, 10), strconv.FormatBool(todo.done)) }
     hx-target="closest <li/>"
     hx-swap="outerHTML"
     _="
@@ -66,8 +66,8 @@ templ editTodo(todo Todo) {
     } else {
       value=""
     }
-    hx-trigger="keyup[keyCode==13], title"
-    hx-get={ fmt.Sprintf(`/update-todo?id=%s`, todo.id) }
+    hx-trigger="keyup[keyCode==13]"
+    hx-get={ fmt.Sprintf(`/update-todo?id=%s`, strconv.FormatUint(todo.id, 10)) }
     hx-target="closest <li/>"
     hx-swap="outerHTML"
     autofocus
@@ -78,7 +78,7 @@ templ editTodo(todo Todo) {
 }
 
 templ todoItem(todo Todo) {
-  <li id={ todo.id }
+  <li
     class={ "todo", templ.KV("completed", todo.done), templ.KV("editing", todo.editing) }
     _="
       on destroy my.querySelector('button').click()
@@ -94,7 +94,7 @@ templ todoItem(todo Todo) {
       @todoCheck(todo)
       <label
         hx-trigger="dblclick"
-        hx-patch={ fmt.Sprintf(`/edit-todo?id=%s`, todo.id) }
+        hx-patch={ fmt.Sprintf(`/edit-todo?id=%s`, strconv.FormatUint(todo.id, 10)) }
         hx-target="next input"
         hx-swap="outerHTML"
         _="
@@ -107,7 +107,7 @@ templ todoItem(todo Todo) {
       </label>
       <button
         class="destroy"
-        hx-delete={ fmt.Sprintf(`/remove-todo?id=%s`, todo.id) }
+        hx-delete={ fmt.Sprintf(`/remove-todo?id=%s`, strconv.FormatUint(todo.id, 10)) }
         hx-trigger="click"
         hx-target="closest <li/>"
         _="
@@ -136,7 +136,7 @@ templ Page(todos []Todo, filters []Filter, checked bool) {
       <section
         class="todoapp"
         hx-get="/get-hash"
-        hx-vals="js:{hash: window.location.hash}"
+        hx-vals="js:{hash: window.location.hash.slice(2)}"
         hx-trigger="load"
         hx-target=".filters"
         hx-swap="outerHTML"
