@@ -15,6 +15,7 @@
 - install templ `go install github.com/a-h/templ/cmd/templ@latest`
 - run `templ generate`
 - finally run `go run .`
+- visit `http://localhost:8888`
 - alternatively you can compile into executable with `go build .`
 
 ### HTMX

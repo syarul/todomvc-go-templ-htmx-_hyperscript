@@ -41,9 +41,9 @@ const (
 )
 
 var filters = []Filter{
-	{url: "#/", name: "all", selected: true},
-	{url: "#/active", name: "active", selected: false},
-	{url: "#/completed", name: "completed", selected: false},
+	{url: "#/", name: "All", selected: true},
+	{url: "#/active", name: "Active", selected: false},
+	{url: "#/completed", name: "Completed", selected: false},
 }
 
 func (t *todos) crudOps(action Action, todo Todo) Todo {
@@ -118,7 +118,7 @@ func main() {
 	// start the server.
 	addr := os.Getenv("LISTEN_ADDRESS")
 	if addr == "" {
-		addr = "localhost:8080"
+		addr = "localhost:8888"
 	}
 
 	fmt.Printf("Listening on %s\n", addr)
@@ -204,7 +204,7 @@ func (t *todos) getHash(w http.ResponseWriter, r *http.Request) {
 		if len(hash) != 0 {
 			name = hash
 		} else {
-			name = "all"
+			name = "All"
 		}
 	}
 	// loop through filters and update the selected field
@@ -222,6 +222,8 @@ func (t *todos) getHash(w http.ResponseWriter, r *http.Request) {
 
 func (t *todos) pageHandler(w http.ResponseWriter, r *http.Request) {
 	// start with new todo data when refresh
+	// *t = make([]Todo, 0)
+	// idCounter = 0
 	templRenderer(w, r, Page(*t, filters, defChecked(*t), hasCompleteTask(*t)))
 }
 
@@ -248,7 +250,12 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	todo := t.crudOps(Create, Todo{id, title, false, false})
 
-	templRenderer(w, r, todoItem(todo))
+	if len(*t) == 1 {
+		templRenderer(w, r, todoList(*t))
+	} else {
+		templRenderer(w, r, todoItem(todo))
+	}
+
 }
 
 func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
@@ -324,26 +331,26 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	esc, err := strconv.ParseBool(r.FormValue("esc"))
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
+	// esc, err := strconv.ParseBool(r.FormValue("esc"))
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
 
 	title := r.FormValue("title")
 
 	// esc will not do update instead will send the original unmodified title
-	if esc {
-		todo := t.crudOps(Edit, Todo{id, "", false, false})
-		templRenderer(w, r, todoItem(todo))
-	} else {
-		todo := t.crudOps(Update, Todo{id, title, false, false})
-		if len(todo.title) == 0 {
-			byteRenderer(w, r, "")
-			return
-		}
-		templRenderer(w, r, todoItem(todo))
+	// if esc {
+	// 	todo := t.crudOps(Edit, Todo{id, "", false, false})
+	// 	templRenderer(w, r, todoItem(todo))
+	// } else {
+	todo := t.crudOps(Update, Todo{id, title, false, false})
+	if len(todo.title) == 0 {
+		byteRenderer(w, r, "")
+		return
 	}
+	templRenderer(w, r, todoItem(todo))
+	// }
 }
 
 func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {

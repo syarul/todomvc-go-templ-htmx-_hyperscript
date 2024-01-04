@@ -67,8 +67,6 @@ templ todoCheck(todo Todo) {
 
 // blur event handle both keyup ESC and blur
 // where only blur should trigger update call while ESC is not
-// to solve this I write a htmx extension 'esc-blur-polyfill' that check the
-// specific event where ESC produce 'triggeringEvent.sourceCapabilities' as null
 // where the query send to server added one more parameter &esc=true or false
 // according to user event
 templ editTodo(todo Todo) {
@@ -80,14 +78,23 @@ templ editTodo(todo Todo) {
     } else {
       value=""
     }
-    hx-trigger="keyup[keyCode==13], blur"
-    hx-get={ fmt.Sprintf(`/update-todo?id=%s`, strconv.FormatUint(todo.id, 10)) }
-    hx-target="closest <li/>"
-    hx-swap="outerHTML"
-    hx-ext="esc-blur-polyfill"
+    todo-id={ strconv.FormatUint(todo.id, 10) }
     autofocus
     _="
-      on keyup[keyCode==27] remove .editing from closest <li/>
+      on keyup[keyCode==27]
+        set $keyup to 'esc'
+        remove .editing from closest <li/>
+      on keyup[keyCode==13]
+        set $keyup to 'enter'
+        htmx.ajax('GET', `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap:'outerHTML'})
+      on blur debounced at 10ms
+        if $keyup === 'enter'
+          set $keyup to 'none'
+        else if $keyup === 'esc'
+          set $keyup to 'none'
+        else
+          htmx.ajax('GET', `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap:'outerHTML'})
+      end
       on htmx:afterRequest
         send toggleMain to <section.todoapp/>
         send toggleFooter to <section.todoapp/>
@@ -98,6 +105,7 @@ templ editTodo(todo Todo) {
 
 templ todoItem(todo Todo) {
   <li
+    id={ strconv.FormatUint(todo.id, 10) }
     class={ "todo", templ.KV("completed", todo.done), templ.KV("editing", todo.editing) }
     _="
       on destroy my.querySelector('button').click()
@@ -155,14 +163,14 @@ templ toggleMain(todos []Todo, checked bool) {
     </section>
   }
 }
-// toggleDisplayClearCompleted
+
 templ clearCompleted (hasCompleted bool) {
   if hasCompleted {
     <button class="clear-completed"
       _="
         on load set $clearCompleted to me
         on click send destroy to <li.completed/>"
-    >Clear Complete</button>
+    >Clear completed</button>
   }
 }
 
@@ -195,6 +203,26 @@ templ footer(todos []Todo, filters []Filter, hasCompleted bool) {
   }
 }
 
+templ todoList(todos []Todo) {
+  if len(todos) != 0 {
+    <ul
+      class="todo-list"
+      _="
+        on load debounced at 10ms 
+          set $todo to me
+          send todoCount to <span.todo-count/>
+          send toggleAll to <input.toggle-all/>
+          send show to <li.todo/>
+          send toggleMain to <section.todoapp/>
+          send toggleFooter to <section.todoapp/>"
+    >
+      for _, todo := range todos {
+        @todoItem(todo)
+      }
+    </ul>
+  }
+}
+
 templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool) {
   <html lang="en" data-framework="htmx">
     <head>
@@ -209,7 +237,7 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool) {
         _="
           on toggleMain
             if $sectionMain === undefined and $todo.hasChildNodes()
-              fetch /toggle-main then put the result after <header.header/>
+              htmx.ajax('GET', '/toggle-main', {target:'.todo-list', swap:'beforebegin'})
             else if $sectionMain and $todo.hasChildNodes() === false
               remove $sectionMain
               set $sectionMain to undefined
@@ -220,44 +248,39 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool) {
                 htmx.ajax('GET', `/get-hash?hash=${window.location.hash.slice(2)}`, {target:'.filters', swap:'outerHTML'})
             else if $footerFooter and $todo.hasChildNodes() === false
               remove $footerFooter
+              remove $todo
+              set $todo to undefined
               set $clearCompleted to undefined
               set $footerFooter to undefined
+            else if $clearCompleted
+              fetch /completed then if it === ''
+                remove $clearCompleted
+                set $clearCompleted to undefined
             end"
       >
         <header class="header">
-          <ul class="phdr"></ul>
           <h1>todos</h1>
           <input
             id="add-todo"
             name="title"
             class="new-todo"
             placeholder="What needs to be done?"
-            hx-get="/add-todo"
-            hx-trigger="keyup[keyCode==13]"
-            hx-target=".todo-list"
-            hx-swap="beforeend"
             _="
               on load my.focus()
-              on htmx:afterRequest set my value to ''
-              on focus my.focus()"
+              on focus my.focus()
+              on keyup[keyCode==13]
+                if $todo
+                  htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.todo-list', swap:'beforeend'})
+                  set my value to ''
+                  my.focus()
+                else
+                  htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.header', swap:'beforeend'})
+                  set my value to ''
+                  my.focus()"
             autofocus />
         </header>
         @toggleMain(todos, checked)
-        <ul
-          class="todo-list"
-          _="
-            on load debounced at 10ms 
-              set $todo to me
-              send todoCount to <span.todo-count/>
-              send toggleAll to <input.toggle-all/>
-              send show to <li.todo/>
-              send toggleMain to <section.todoapp/>
-              send toggleFooter to <section.todoapp/>"
-        >
-          for _, todo := range todos {
-            @todoItem(todo)
-          }
-        </ul>
+        @todoList(todos)
         @footer(todos, filters, hasCompleted)
       </section>
       <footer class="info" _="on load debounced at 100ms call startMeUp()">
@@ -269,7 +292,8 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool) {
     </body>
     <script src="https://unpkg.com/todomvc-common@1.0.5/base.js" />
     <script src="https://unpkg.com/htmx.org@1.9.10" />
-    <script src="https://cdn.jsdelivr.net/npm/esc-blur-polyfill@1.0.2/esc-blur-polyfill.js" />
+    <!--script src="https://cdn.jsdelivr.net/npm/esc-blur-polyfill@1.0.2/esc-blur-polyfill.js" /-->
+    <script src="/assets/js/esc-blur-polyfill.js" />
     <script src="https://unpkg.com/hyperscript.org/dist/_hyperscript.js" />
     <script type="text/hyperscript">
       def startMeUp()
