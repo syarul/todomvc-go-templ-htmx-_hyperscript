@@ -1,4 +1,4 @@
-name: Go
+name: Go Build and Cypress Tests
 
 on:
   push:
@@ -31,3 +31,37 @@ jobs:
 
       - name: Build
         run: go build .
+        
+  cypress-tests:
+    runs-on: ubuntu-latest
+
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Clone cypress-example-todomvc
+      run: git clone https://github.com/cypress-io/cypress-example-todomvc.git cypress-example-todomvc
+
+    - name: Install Dependencies
+      run: |
+        cd cypress-example-todomvc
+        npm install
+
+    - name: Start Go Application
+      run: go run .
+
+    - name: Wait for Go Application to Start
+      run: sleep 10 # Adjust this sleep duration based on your app's startup time
+
+    - name: Run Cypress Tests
+      run: |
+        cd cypress-example-todomvc
+        npm run cypress:run
+
+    - name: Stop Go Application
+      run: pkill -f "go run ."
+  
