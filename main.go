@@ -92,7 +92,6 @@ func main() {
 	t := &todos{}
 
 	// Register the routes.
-	// http.Handle("/get-hash", http.HandlerFunc(t.getHash))
 	http.Handle("/set-hash", http.HandlerFunc(setHash))
 	http.Handle("/learn.json", http.HandlerFunc(learnHandler))
 
@@ -398,7 +397,6 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templRenderer(w, r, todoItem(todo, selectedFilter(filters)))
-	// }
 }
 
 func (t *todos) removeTodo(w http.ResponseWriter, r *http.Request) {
