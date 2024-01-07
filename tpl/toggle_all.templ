@@ -1,0 +1,18 @@
+package tpl
+
+templ ToggleAll(checked bool) {
+  <input id="toggle-all" class="toggle-all" type="checkbox"
+    checked?={ checked }
+    _="
+      on load set $toggleAll to me
+      on toggleAll debounced at 100ms
+        fetch /toggle-all then
+        if it === 'true' and my.checked === false then
+          set my.checked to true
+        else
+          if my.checked === true and it === 'false' then set my.checked to false
+        end
+      end
+      on click send toggle to <input.toggle/>"
+  />
+}

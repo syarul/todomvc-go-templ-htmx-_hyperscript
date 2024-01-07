@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
+	"todomvc/go-templ-htmx-_hyperscript/tpl"
 
 	"github.com/a-h/templ"
 )
@@ -14,9 +18,9 @@ import (
 var idCounter uint64
 
 type Todo struct {
-	id      uint64
+	Id      uint64 `json:"id"`
 	title   string
-	done    bool
+	Done    bool `json:"done"`
 	editing bool
 }
 
@@ -50,7 +54,7 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 	index := -1
 	if action != Create {
 		for i, r := range *t {
-			if r.id == todo.id {
+			if r.Id == todo.Id {
 				index = i
 				break
 			}
@@ -61,7 +65,7 @@ func (t *todos) crudOps(action Action, todo Todo) Todo {
 		*t = append(*t, todo)
 		return todo
 	case Toggle:
-		(*t)[index].done = todo.done
+		(*t)[index].Done = todo.Done
 	case Update:
 		title := strings.Trim(todo.title, " ")
 		if len(title) != 0 {
@@ -88,12 +92,14 @@ func main() {
 	t := &todos{}
 
 	// Register the routes.
-	http.Handle("/get-hash", http.HandlerFunc(t.getHash))
+	// http.Handle("/get-hash", http.HandlerFunc(t.getHash))
+	http.Handle("/set-hash", http.HandlerFunc(setHash))
 	http.Handle("/learn.json", http.HandlerFunc(learnHandler))
 
 	http.Handle("/update-counts", http.HandlerFunc(t.updateCounts))
 	http.Handle("/toggle-all", http.HandlerFunc(t.toggleAllHandler))
 	http.Handle("/completed", http.HandlerFunc(t.clearCompleted))
+	http.Handle("/footer", http.HandlerFunc(t.footerHandler))
 
 	http.Handle("/", http.HandlerFunc(t.pageHandler))
 
@@ -105,15 +111,18 @@ func main() {
 
 	http.Handle("/toggle-main", http.HandlerFunc(t.toggleMainHandler))
 	http.Handle("/toggle-footer", http.HandlerFunc(t.toggleFooterHandler))
+	http.Handle("/todo-list", http.HandlerFunc(t.todoListHandler))
+	http.Handle("/todo-json", http.HandlerFunc(t.getJSON))
+	http.Handle("/todo-item", http.HandlerFunc(t.todoItemHandler))
 
-	// Specify the directory containing your static files
-	dir := "./assets"
+	// this is used to serve axe-core for the todomvc test
+	dir := "./cypress-example-todomvc/node_modules"
 
 	// Use the http.FileServer to create a handler for serving static files
 	fs := http.FileServer(http.Dir(dir))
 
 	// Use the http.Handle to register the file server handler for a specific route
-	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
+	http.Handle("/node_modules/", http.StripPrefix("/node_modules/", fs))
 
 	// start the server.
 	addr := os.Getenv("LISTEN_ADDRESS")
@@ -133,7 +142,7 @@ func main() {
 func countNotDone(todos []Todo) int {
 	count := 0
 	for _, todo := range todos {
-		if !todo.done {
+		if !todo.Done {
 			count++
 		}
 	}
@@ -155,7 +164,7 @@ func defChecked(todos []Todo) bool {
 // has completeTask checks if there is any completed task in the Todos slice
 func hasCompleteTask(todos []Todo) bool {
 	for _, todo := range todos {
-		if todo.done {
+		if todo.Done {
 			return true
 		}
 	}
@@ -183,29 +192,30 @@ func learnHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(emptyJSON)
 }
 
-// getHash handles the GET request for the #/:name route.
-// it updates the selected field of each filter based on the name query parameter.
-// on initial fetch when todos is empty it will send "empty string" which usually
-// ignored by htmx, the reason here we want to make use templ rendering to behave
-// efficiently by rendering only needed html, this use case usually available in
-// modern client framework i.e., in React you can do
-// <>{todo.length && <TodoList />}</>
-// so you can do the same in HTMX too!
-func (t *todos) getHash(w http.ResponseWriter, r *http.Request) {
-	if len(*t) == 0 {
-		byteRenderer(w, r, "")
-		return
-	}
+// this for acquiring todos as json where client can fetch todo to render when route change
+// its pretty much as the same how react do DOM diffing instead we do it on server and send
+// the needed rendered HTML as client check which one is missing
+func (t *todos) getJSON(w http.ResponseWriter, r *http.Request) {
+	// set the Content-Type header to indicate JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(*t)
+}
 
-	hash := r.FormValue("hash")
+func selectedFilter(filters []Filter) string {
+	for _, filter := range filters {
+		if filter.selected {
+			return filter.name
+		}
+	}
+	return "All"
+}
+
+func setHash(w http.ResponseWriter, r *http.Request) {
+
 	name := r.FormValue("name")
 
 	if len(name) == 0 {
-		if len(hash) != 0 {
-			name = hash
-		} else {
-			name = "All"
-		}
+		name = "All"
 	}
 	// loop through filters and update the selected field
 	for i := range filters {
@@ -216,15 +226,51 @@ func (t *todos) getHash(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// render the filter component with the updated filters
-	templRenderer(w, r, filter(filters))
+	byteRenderer(w, r, "")
+}
+
+func generateRandomString(length int) (string, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(bytes), nil
+}
+
+func (t *todos) footerHandler(w http.ResponseWriter, r *http.Request) {
+	templRenderer(w, r, footer(*t, filters, hasCompleteTask(*t)))
 }
 
 func (t *todos) pageHandler(w http.ResponseWriter, r *http.Request) {
-	// start with new todo data when refresh
-	// *t = make([]Todo, 0)
-	// idCounter = 0
-	templRenderer(w, r, Page(*t, filters, defChecked(*t), hasCompleteTask(*t)))
+	_, err := r.Cookie("sessionId")
+
+	if err == http.ErrNoCookie {
+		// fmt.Println("Error:", err)
+		newCookieValue, err := generateRandomString(32)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		newCookie := http.Cookie{
+			Name:     "sessionId",
+			Value:    newCookieValue,
+			Expires:  time.Now().Add(time.Second * 6000),
+			HttpOnly: true,
+		}
+		http.SetCookie(w, &newCookie)
+
+		// start with new todo data when session is reset
+		*t = make([]Todo, 0)
+		idCounter = 0
+	}
+
+	templRenderer(w, r, Page(*t, filters, defChecked(*t), hasCompleteTask(*t), selectedFilter(filters)))
+}
+
+func (t *todos) todoListHandler(w http.ResponseWriter, r *http.Request) {
+	templRenderer(w, r, todoList(*t, selectedFilter(filters)))
 }
 
 // toggle section main
@@ -251,18 +297,31 @@ func (t *todos) addTodoHandler(w http.ResponseWriter, r *http.Request) {
 	todo := t.crudOps(Create, Todo{id, title, false, false})
 
 	if len(*t) == 1 {
-		templRenderer(w, r, todoList(*t))
+		templRenderer(w, r, todoList(*t, selectedFilter(filters)))
 	} else {
-		templRenderer(w, r, todoItem(todo))
+		templRenderer(w, r, todoItem(todo, selectedFilter(filters)))
 	}
 
+}
+
+func (t *todos) todoItemHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.FormValue("id"), 0, 32)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	todo := t.crudOps(Edit, Todo{id, "", false, false})
+
+	templRenderer(w, r, todoItem(todo, selectedFilter(filters)))
 }
 
 func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
 	// determine render "none" or "block" based on incomplete tasks
 	hasCompleted := hasCompleteTask(*t)
 	if hasCompleted {
-		templRenderer(w, r, clearCompleted(hasCompleteTask(*t)))
+		templRenderer(w, r, tpl.ClearCompleted(hasCompleteTask(*t)))
 	} else {
 		byteRenderer(w, r, "")
 	}
@@ -302,7 +361,7 @@ func (t *todos) toggleTodo(w http.ResponseWriter, r *http.Request) {
 
 	todo := t.crudOps(Toggle, Todo{id, "", !done, false})
 
-	templRenderer(w, r, todoItem(todo))
+	templRenderer(w, r, todoItem(todo, selectedFilter(filters)))
 }
 
 func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +379,7 @@ func (t *todos) editTodoHandler(w http.ResponseWriter, r *http.Request) {
 	// since editing only client side changes
 	todo := t.crudOps(Edit, Todo{id, "", false, false})
 
-	templRenderer(w, r, editTodo(Todo{id, todo.title, todo.done, true}))
+	templRenderer(w, r, editTodo(Todo{id, todo.title, todo.Done, true}))
 }
 
 func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
@@ -331,25 +390,14 @@ func (t *todos) updateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// esc, err := strconv.ParseBool(r.FormValue("esc"))
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
-
 	title := r.FormValue("title")
 
-	// esc will not do update instead will send the original unmodified title
-	// if esc {
-	// 	todo := t.crudOps(Edit, Todo{id, "", false, false})
-	// 	templRenderer(w, r, todoItem(todo))
-	// } else {
 	todo := t.crudOps(Update, Todo{id, title, false, false})
 	if len(todo.title) == 0 {
 		byteRenderer(w, r, "")
 		return
 	}
-	templRenderer(w, r, todoItem(todo))
+	templRenderer(w, r, todoItem(todo, selectedFilter(filters)))
 	// }
 }
 

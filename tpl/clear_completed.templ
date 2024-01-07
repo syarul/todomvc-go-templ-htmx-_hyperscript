@@ -1,0 +1,11 @@
+package tpl
+
+templ ClearCompleted (hasCompleted bool) {
+  if hasCompleted {
+    <button class="clear-completed"
+      _="
+        on load set $clearCompleted to me
+        on click send destroy to <li.completed/>"
+    >Clear completed</button>
+  }
+}

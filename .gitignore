@@ -1,2 +1,3 @@
 todomvc_templ.go
+tpl/*.go
 go-templ-htmx-_hyperscript.exe

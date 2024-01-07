@@ -9,6 +9,13 @@
     ===========================================================
             Build with GO, TEMPL, HTMX & _HYPERSCRIPT
 [![Go](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml/badge.svg)](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml)
+
+### Testing
+As evidence of HTMX's capabilities in emulating the functionalities of modern frameworks, I have incorporated [unit test](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/runs/7412273948/job/20168687544) from https://github.com/cypress-io/cypress-example-todomvc. This demonstration serves to showcase that HTMX, when paired with _hyperscript, can replicate all the behaviors typically associated with most modern client frameworks.
+
+### Security
+Check on [this link](https://templ.guide/security/) when using `templ` as HTML template engine. At anytime as developer `Do not blame the farmer if you cook the rice til it burns.`
+
 ### Usage
 - install go if you don't have
 - run `go mod tidy` to fetch all needed modules
@@ -20,3 +27,7 @@
 
 ### HTMX
 Visit [https://github.com/rajasegar/awesome-htmx](https://github.com/rajasegar/awesome-htmx) to look for HTMX curated infos
+
+###
+Todo
+- Use behavior to modular the _hyperscript scripts
