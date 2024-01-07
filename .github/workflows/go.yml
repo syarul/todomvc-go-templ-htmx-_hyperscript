@@ -52,7 +52,9 @@ jobs:
         npm install
 
     - name: Start Go Application
-      run: go run .
+      run: |
+        cd ..
+        go run .
 
     - name: Wait for Go Application to Start
       run: sleep 10 # Adjust this sleep duration based on your app's startup time
