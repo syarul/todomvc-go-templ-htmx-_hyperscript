@@ -11,7 +11,6 @@ templ filter(filters []Filter) {
     for _, filter := range filters {
       <li>
         <a class={ templ.KV("selected", filter.selected)  } href={ templ.SafeURL(filter.url) }
-          hx-boost="true"
           _="on click add .selected to me"
         >
           { filter.name }
@@ -51,7 +50,8 @@ templ editTodo(todo Todo) {
           htmx.ajax('GET', `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap:'outerHTML'})
       end
       send toggleMain to <section.todoapp/>
-      send toggleFooter to <section.todoapp/>"
+      send toggleFooter to <section.todoapp/>
+      "
   />
 }
 
@@ -72,7 +72,8 @@ templ todoCheck(todo Todo) {
         if $toggleAll.checked and my.checked === false
           my.click()
         else if $toggleAll.checked === false and my.checked
-          my.click()"
+          my.click()
+      "
   />
 }
 
@@ -81,8 +82,7 @@ templ todoItem(todo Todo, filterName string) {
     <li
       id={ fmt.Sprintf(`todo-%s`, strconv.FormatUint(todo.Id, 10)) }
       class={ "todo", templ.KV("completed", todo.Done), templ.KV("editing", todo.editing) }
-      _="
-        on destroy my.querySelector('button').click()"
+      _="on destroy my.querySelector('button').click()"
     >
       <div class="view">
         @todoCheck(todo)
@@ -96,7 +96,8 @@ templ todoItem(todo Todo, filterName string) {
               add .editing to the closest <li/>
             on htmx:afterRequest
               set $el to my.parentNode.nextSibling
-              set $el.selectionStart to $el.value.length"
+              set $el.selectionStart to $el.value.length
+            "
         >
           { todo.title }
         </label><button
@@ -110,7 +111,8 @@ templ todoItem(todo Todo, filterName string) {
               send toggleMain to <section.todoapp/>
               send toggleFooter to <section.todoapp/>
               send focus to <input.new-todo/>
-              send toggleClearCompleted to <footer.footer/>"
+              send toggleClearCompleted to <footer.footer/>
+            "
         />
       </div>
       @editTodo(todo)
@@ -130,7 +132,7 @@ templ toggleMain(todos []Todo, checked bool) {
     </section>
   }
 }
-
+// indescriminatelyx 
 templ footer(todos []Todo, filters []Filter, hasCompleted bool) {
   if len(todos) != 0 {
     <footer class="footer"
@@ -140,6 +142,8 @@ templ footer(todos []Todo, filters []Filter, hasCompleted bool) {
           if $clearCompleted === undefined
             htmx.ajax('GET', '/completed', {target:'.filters', swap:'afterend'})
           else
+            // need to first set to undefined in case the fetch may return empty which
+            // will indiscriminately leave it in incorrect state
             set $clearCompleted to undefined
             htmx.ajax('GET', '/completed', {target:'.clear-completed', swap:'outerHTML'})
           send toggleFooter to <section.todoapp/>
@@ -151,7 +155,8 @@ templ footer(todos []Todo, filters []Filter, hasCompleted bool) {
         _="
           on load send todoCount to me
           on todoCount debounced at 100ms
-            fetch /update-counts then put the result into me"
+            fetch /update-counts then put the result into me
+          "
       />
       @filter(filters)
       @tpl.ClearCompleted(hasCompleted)
@@ -163,8 +168,7 @@ templ todoList(todos []Todo, selectedFilter string) {
   if len(todos) != 0 {
     <ul
       class="todo-list"
-      _="
-        on load set $todo to me"
+      _="on load set $todo to me"
     >
       for _, todo := range todos {
         @todoItem(todo, selectedFilter)
@@ -186,7 +190,6 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
         class="todoapp"
         _="
           on toggleMain debounced at 1ms
-            // log 'do main'
             if $sectionMain
               set $sectionMain to undefined
               htmx.ajax('GET', '/toggle-main', {target:'section.main', swap:'outerHTML'})
@@ -194,16 +197,15 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
               htmx.ajax('GET', '/toggle-main', {target:'.todo-list', swap:'beforebegin'})
             end
           on toggleFooter debounced at 1ms
-            // log 'do footer'
             if $footerFooter
-              fetch /todo-json then
-              JSON.parse(it)
+              fetch /todo-json as json then
               if $todo.hasChildNodes() === false and it.length === 0
                 remove $footerFooter
                 set $footerFooter to undefined
               end
-              // set hash already update the hash on the server
-              // this only do representation of the filter class which one need selected
+              // set-hash already update the hash on the server
+              // this reassign the filter class selected base on user interaction
+              // or location hash changes
               for filter in $filter.children
                 if filter.textContent === 'All' and `${$initial}${$after}` === ''
                   add .selected to filter.firstChild
@@ -217,8 +219,9 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
               htmx.ajax('GET', '/footer', {target:'.header', swap:'beforeend'})
             end
           on show wait 20ms
-            fetch /todo-json then
-              JSON.parse(it)
+            // this is the DOM tree diffing of the todo-list, fetch only the needed
+            // to render and remove accordingly base on route All/Active/Completed
+            fetch /todo-json as json then
               if window.location.hash === '#/active'
                 for todo in it
                   if todo.done
@@ -246,7 +249,7 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
                 for todo in it
                   // check if the element exist in the current DOM, add if none
                   // placement is decided according to order if there's an element
-                  // with higher than the current todo do 'beforebegin'
+                  // with higher than the current todo swap as 'beforebegin'
 
                   for el in $todo.children
                     if parseInt(el.id.slice(5)) > todo.id and document.getElementById(`todo-${todo.id}`) === null
@@ -254,7 +257,7 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
                     end
                   end
 
-                  // do reverse lookup for lower than the current todo do 'afterend'
+                  // do reverse lookup for lower than the current todo swap as 'afterend'
                   for el in Array.from($todo.children).reverse()
                     if parseInt(el.id.slice(5)) < todo.id and document.getElementById(`todo-${todo.id}`) === null
                       htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target: `#${el.id}`, swap:'afterend'})
@@ -292,7 +295,8 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
                   set my value to ''
                 end
                   send toggleMain to <section.todoapp/>
-                  send toggleFooter to <section.todoapp/>"
+                  send toggleFooter to <section.todoapp/>
+            "
           />
         </header>
         @toggleMain(todos, checked)
@@ -301,11 +305,10 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
       </section>
       <footer class="info" 
         _="
-          on beforeunload log me
           on load debounced at 10ms
             call startMeUp()
             hashCache()
-            "
+        "
       >
         <p>Double-click to edit a todo</p>
         <p>Created by <a href="http://github.com/syarul/">syarul</a></p>
@@ -337,7 +340,6 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
                   by http://github.com/syarul/"
       end
       def hashCache()
-        // log 'called hashCache!'
         // this is done to get current location hash then update todo-list and footer
         set $initial to window.location.hash.slice(2).charAt(0).toUpperCase()
         set $after to window.location.hash.slice(3)
@@ -345,7 +347,7 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
           send show to <section.todoapp/>
           send toggleFooter to <section.todoapp/>
       end
-      // this to handle popstate event such as back/foward button
+      // this to handle popstate event such as back/forward button
       // where it will automatically calling hashCache _hyperscript function
       js
         window.addEventListener('popstate', function(){
