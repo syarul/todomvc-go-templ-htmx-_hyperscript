@@ -1,1 +1,1 @@
-*.c linguist-language=C++
+*.templ linguist-language=Go
