@@ -1,0 +1,11 @@
+behavior Footer 
+  on load set $footerFooter to me
+  on toggleClearCompleted debounced at 20ms
+    if $clearCompleted === undefined
+      htmx.ajax("GET", "/completed", {target:".filters", swap: "afterend"})
+    else
+      -- need to first set to undefined in case the fetch may return empty which
+      -- will indiscriminately leave it in incorrect state
+      set $clearCompleted to undefined
+      htmx.ajax("GET", "/completed", {target:".clear-completed", swap: "outerHTML"})
+    send toggleFooter to <section.todoapp/>

@@ -1,0 +1,50 @@
+behavior ToggleShow 
+  on show wait 20ms
+    -- log "show"
+    -- this is the DOM tree diffing of the todo-list, fetch only the needed
+    -- to render and remove accordingly base on route All/Active/Completed
+    fetch /todo-json as json then
+      if window.location.hash === "#/active"
+        for todo in it
+          if todo.done
+            document.getElementById(`todo-${todo.id}`) then if it remove it end
+          else
+            document.getElementById(`todo-${todo.id}`) then
+            if it === null
+              htmx.ajax("GET", `/todo-item?id=${todo.id}`, {target:".todo-list", swap: "beforeend"})
+            end
+          end
+        end
+      else if window.location.hash === "#/completed"
+        for todo in it
+          if todo.done
+            document.getElementById(`todo-${todo.id}`) then
+            if it === null
+              htmx.ajax("GET", `/todo-item?id=${todo.id}`, {target:".todo-list", swap: "beforeend"})
+            end
+          else
+            document.getElementById(`todo-${todo.id}`) then if it remove it end
+          end
+        end
+      else
+        -- loop through the JSON
+        for todo in it
+          -- check if the element exist in the current DOM, add if none
+          -- placement is decided according to order if there"s an element
+          -- with higher than the current todo swap as "beforebegin"
+          for el in $todo.children
+            if parseInt(el.id.slice(5)) > todo.id and document.getElementById(`todo-${todo.id}`) === null
+              htmx.ajax("GET", `/todo-item?id=${todo.id}`, {target: `#${el.id}`, swap: "beforebegin"})
+            end
+          end
+          -- do reverse lookup for lower than the current todo swap as "afterend"
+          for el in Array.from($todo.children).reverse()
+            if parseInt(el.id.slice(5)) < todo.id and document.getElementById(`todo-${todo.id}`) === null
+              htmx.ajax("GET", `/todo-item?id=${todo.id}`, {target: `#${el.id}`, swap: "afterend"})
+            end
+          end
+          -- if todo is empty initially recursively add all of it
+          if $todo.children.length === 0
+            htmx.ajax("GET", `/todo-item?id=${todo.id}`, {target:".todo-list", swap: "beforeend"})
+          end
+        end

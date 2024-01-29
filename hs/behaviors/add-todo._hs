@@ -1,0 +1,19 @@
+behavior AddTodo
+  on load send focus to me
+    on focus
+      if $focus === undefined
+        my.focus()
+        set $isFocus to 'true'
+    end
+    on blur set $isFocus to undefined
+    on keyup[keyCode==13]
+      if $todo
+        htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.todo-list', swap:'beforeend'})
+        set my value to ''
+      else
+        htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.header', swap:'beforeend'})
+        set my value to ''
+      end
+        send toggleMain to <section.todoapp/>
+        send toggleFooter to <section.todoapp/>
+end

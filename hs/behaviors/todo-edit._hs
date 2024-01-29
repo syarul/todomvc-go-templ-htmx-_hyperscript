@@ -1,0 +1,19 @@
+behavior TodoEdit
+  on load
+    my.focus()
+  on keyup[keyCode==27]
+    set $keyup to "esc"
+    remove .editing from closest <li/>
+  on keyup[keyCode==13]
+    set $keyup to "enter"
+    htmx.ajax("GET", `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap: "outerHTML"})
+  on blur debounced at 10ms
+    if $keyup === "enter"
+      set $keyup to "none"
+    else if $keyup === "esc"
+      set $keyup to "none"
+    else
+      htmx.ajax("GET", `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap: "outerHTML"})
+  end
+  send toggleMain to <section.todoapp/>
+  send toggleFooter to <section.todoapp/>
