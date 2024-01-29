@@ -11,6 +11,11 @@
 [![Go](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml/badge.svg)](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/workflows/go.yml)
 
 ### E2E Testing
+
+
+https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/assets/2774594/fdcba602-73f2-499b-a106-152569d37e80
+
+
 As evidence of HTMX's capabilities in emulating the functionalities of modern frameworks, I have incorporated [cypress test](https://github.com/syarul/todomvc-go-templ-htmx-_hyperscript/actions/runs/7412273948/job/20168687544) from https://github.com/cypress-io/cypress-example-todomvc. This demonstration serves to showcase that HTMX, when paired with _hyperscript, can replicate if not all the behaviors typically associated with most modern client framework with minimum needs to write javascript.
 
 ### Security
