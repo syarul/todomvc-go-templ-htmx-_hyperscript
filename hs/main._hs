@@ -1,0 +1,15 @@
+def hashCache()
+  -- this is done to get current location hash then update todo-list and footer
+  set $initial to window.location.hash.slice(2).charAt(0).toUpperCase()
+  set $after to window.location.hash.slice(3)
+  fetch `/set-hash?name=${$initial}${$after}` then
+    send show to <section.todoapp/>
+    send toggleFooter to <section.todoapp/>
+  end
+  -- this to handle popstate event such as back/forward button
+  -- where it will automatically calling hashCache _hyperscript function
+  js
+    window.addEventListener('popstate', function(){
+      hashCache();
+    });
+end

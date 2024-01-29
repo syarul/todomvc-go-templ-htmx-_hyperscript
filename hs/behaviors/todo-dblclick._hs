@@ -1,0 +1,6 @@
+behavior TodoDblclick
+  on dblclick
+    add .editing to the closest <li/>
+  on htmx:afterRequest
+    set $el to my.parentNode.nextSibling
+    set $el.selectionStart to $el.value.length

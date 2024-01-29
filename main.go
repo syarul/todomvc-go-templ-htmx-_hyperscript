@@ -112,16 +112,17 @@ func main() {
 	http.Handle("/toggle-footer", http.HandlerFunc(t.toggleFooterHandler))
 	http.Handle("/todo-list", http.HandlerFunc(t.todoListHandler))
 	http.Handle("/todo-json", http.HandlerFunc(t.getJSON))
+	http.Handle("/swap-json", http.HandlerFunc(t.swapJSON))
 	http.Handle("/todo-item", http.HandlerFunc(t.todoItemHandler))
 
 	// this is used to serve axe-core for the todomvc test
 	dir := "./cypress-example-todomvc/node_modules"
 
-	// Use the http.FileServer to create a handler for serving static files
-	fs := http.FileServer(http.Dir(dir))
+	// serve *._hs file
+	http.Handle("/hs/", http.StripPrefix("/hs/", http.FileServer(http.Dir("./hs"))))
 
-	// Use the http.Handle to register the file server handler for a specific route
-	http.Handle("/node_modules/", http.StripPrefix("/node_modules/", fs))
+	// use the http.Handle to register the file server handler for a specific route
+	http.Handle("/node_modules/", http.StripPrefix("/node_modules/", http.FileServer(http.Dir(dir))))
 
 	// start the server.
 	addr := os.Getenv("LISTEN_ADDRESS")
@@ -198,6 +199,25 @@ func (t *todos) getJSON(w http.ResponseWriter, r *http.Request) {
 	// set the Content-Type header to indicate JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(*t)
+}
+
+// swap json state if toggle is click
+func (t *todos) swapJSON(w http.ResponseWriter, r *http.Request) {
+	all, err := strconv.ParseBool(r.FormValue("all"))
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	for _, todo := range *t {
+		id := todo.Id
+		if all {
+			t.crudOps(Toggle, Todo{id, "", true, false})
+		} else {
+			t.crudOps(Toggle, Todo{id, "", false, false})
+		}
+	}
+	byteRenderer(w, r, "")
 }
 
 func selectedFilter(filters []Filter) string {

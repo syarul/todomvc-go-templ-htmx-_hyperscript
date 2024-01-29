@@ -1,0 +1,9 @@
+behavior ToggleMain
+  on toggleMain debounced at 20ms
+    -- log 'main'
+    if $sectionMain
+      set $sectionMain to undefined
+      htmx.ajax("GET", "/toggle-main", {target: "section.main", swap: "outerHTML"})
+    else
+      htmx.ajax('GET', "/toggle-main", {target: ".todo-list", swap: "beforebegin"})
+    end

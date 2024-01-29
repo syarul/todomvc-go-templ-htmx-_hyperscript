@@ -1,0 +1,11 @@
+behavior TodoCheck
+  on htmx:afterRequest
+    send toggleAll to <input.toggle-all/>
+    send toggleClearCompleted to <footer.footer/>
+    send toggleFooter to <section.todoapp/>
+  on toggle
+    send toggleClearCompleted to <footer.footer/>
+    if $toggleAll.checked and my.checked === false
+      my.click()
+    else if $toggleAll.checked === false and my.checked
+      my.click()

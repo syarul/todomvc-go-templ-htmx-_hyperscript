@@ -1,0 +1,24 @@
+behavior ToggleFooter 
+  on toggleFooter debounced at 20ms
+    -- log 'footer'
+    if $footerFooter
+      fetch /todo-json as json then
+        if $todo.hasChildNodes() === false and it.length === 0
+          remove $footerFooter
+          set $footerFooter to undefined
+        end
+        -- set-hash already update the hash on the server
+        -- this reassign the filter class selected base on user interaction
+        -- or location hash changes
+        for filter in $filter.children
+          if filter.textContent === 'All' and `${$initial}${$after}` === ''
+            add .selected to filter.firstChild
+          else if filter.textContent !== `${$initial}${$after}`
+            remove .selected from filter.firstChild
+          end
+        end
+        -- update counts
+        fetch /update-counts then put the result into <span.todo-count/>
+    else
+      htmx.ajax('GET', '/footer', {target:'.header', swap:'beforeend'})
+    end

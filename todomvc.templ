@@ -32,26 +32,7 @@ templ editTodo(todo Todo) {
       value=""
     }
     todo-id={ strconv.FormatUint(todo.Id, 10) }
-    _="
-      on load
-        my.focus()
-      on keyup[keyCode==27]
-        set $keyup to 'esc'
-        remove .editing from closest <li/>
-      on keyup[keyCode==13]
-        set $keyup to 'enter'
-        htmx.ajax('GET', `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap:'outerHTML'})
-      on blur debounced at 10ms
-        if $keyup === 'enter'
-          set $keyup to 'none'
-        else if $keyup === 'esc'
-          set $keyup to 'none'
-        else
-          htmx.ajax('GET', `/update-todo?id=${@todo-id}&title=${my.value}`, {target: closest <li/>, swap:'outerHTML'})
-      end
-      send toggleMain to <section.todoapp/>
-      send toggleFooter to <section.todoapp/>
-      "
+    _="install TodoEdit"
   />
 }
 
@@ -63,17 +44,7 @@ templ todoCheck(todo Todo) {
     hx-patch={ fmt.Sprintf(`/toggle-todo?id=%s&done=%s`, strconv.FormatUint(todo.Id, 10), strconv.FormatBool(todo.Done)) }
     hx-target="closest <li/>"
     hx-swap="outerHTML"
-    _="
-      on htmx:afterRequest
-        send toggleAll to <input.toggle-all/>
-        send toggleClearCompleted to <footer.footer/>
-      on toggle
-        send toggleClearCompleted to <footer.footer/>
-        if $toggleAll.checked and my.checked === false
-          my.click()
-        else if $toggleAll.checked === false and my.checked
-          my.click()
-      "
+    _="install TodoCheck"
   />
 }
 
@@ -91,13 +62,7 @@ templ todoItem(todo Todo, filterName string) {
           hx-patch={ fmt.Sprintf(`/edit-todo?id=%s`, strconv.FormatUint(todo.Id, 10)) }
           hx-target="next input"
           hx-swap="outerHTML"
-          _="
-            on dblclick
-              add .editing to the closest <li/>
-            on htmx:afterRequest
-              set $el to my.parentNode.nextSibling
-              set $el.selectionStart to $el.value.length
-            "
+          _="install TodoDblclick"
         >
           { todo.title }
         </label><button
@@ -106,13 +71,7 @@ templ todoItem(todo Todo, filterName string) {
           hx-trigger="click"
           hx-target="closest <li/>"
           hx-swap="outerHTML"
-          _="
-            on htmx:afterRequest 
-              send toggleMain to <section.todoapp/>
-              send toggleFooter to <section.todoapp/>
-              send focus to <input.new-todo/>
-              send toggleClearCompleted to <footer.footer/>
-            "
+          _="install Destroy"
         />
       </div>
       @editTodo(todo)
@@ -124,9 +83,7 @@ templ toggleMain(todos []Todo, checked bool) {
   if len(todos) != 0 {
     <section class="main" _="on load set $sectionMain to me">
       @tpl.ToggleAll(checked)
-      <label 
-        for="toggle-all"
-        >
+      <label for="toggle-all">
         Mark all as complete
       </label>
     </section>
@@ -136,27 +93,12 @@ templ toggleMain(todos []Todo, checked bool) {
 templ footer(todos []Todo, filters []Filter, hasCompleted bool) {
   if len(todos) != 0 {
     <footer class="footer"
-      _="
-        on load set $footerFooter to me
-        on toggleClearCompleted
-          if $clearCompleted === undefined
-            htmx.ajax('GET', '/completed', {target:'.filters', swap:'afterend'})
-          else
-            // need to first set to undefined in case the fetch may return empty which
-            // will indiscriminately leave it in incorrect state
-            set $clearCompleted to undefined
-            htmx.ajax('GET', '/completed', {target:'.clear-completed', swap:'outerHTML'})
-          send toggleFooter to <section.todoapp/>
-        "
+      _="install Footer"
     >
       <span
         class="todo-count"
         hx-trigger="load"
-        _="
-          on load send todoCount to me
-          on todoCount debounced at 100ms
-            fetch /update-counts then put the result into me
-          "
+        _="install TodoCount"
       />
       @filter(filters)
       @tpl.ClearCompleted(hasCompleted)
@@ -184,92 +126,29 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
       <title>HTMX • TodoMVC</title>
       <link rel="stylesheet" href="https://unpkg.com/todomvc-common@1.0.5/base.css" type="text/css" />
       <link rel="stylesheet" href="https://unpkg.com/todomvc-app-css/index.css" type="text/css" />
+      <script type="text/hyperscript" src="/hs/start-me-up._hs" />
+      <script type="text/hyperscript" src="/hs/main._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/add-todo._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/toggle-main._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/toggle-footer._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/toggle-show._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/footer._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/toggle-all._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/clear-completed._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/destroy._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/todo-count._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/todo-dblclick._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/todo-check._hs" />
+      <script type="text/hyperscript" src="/hs/behaviors/todo-edit._hs" />
     </head>
     <body>
       <section
         class="todoapp"
         _="
-          on toggleMain debounced at 1ms
-            if $sectionMain
-              set $sectionMain to undefined
-              htmx.ajax('GET', '/toggle-main', {target:'section.main', swap:'outerHTML'})
-            else
-              htmx.ajax('GET', '/toggle-main', {target:'.todo-list', swap:'beforebegin'})
-            end
-          on toggleFooter debounced at 1ms
-            if $footerFooter
-              fetch /todo-json as json then
-              if $todo.hasChildNodes() === false and it.length === 0
-                remove $footerFooter
-                set $footerFooter to undefined
-              end
-              // set-hash already update the hash on the server
-              // this reassign the filter class selected base on user interaction
-              // or location hash changes
-              for filter in $filter.children
-                if filter.textContent === 'All' and `${$initial}${$after}` === ''
-                  add .selected to filter.firstChild
-                else if filter.textContent !== `${$initial}${$after}`
-                  remove .selected from filter.firstChild
-                end
-              end
-              // update counts
-              fetch /update-counts then put the result into <span.todo-count/>
-            else
-              htmx.ajax('GET', '/footer', {target:'.header', swap:'beforeend'})
-            end
-          on show wait 20ms
-            // this is the DOM tree diffing of the todo-list, fetch only the needed
-            // to render and remove accordingly base on route All/Active/Completed
-            fetch /todo-json as json then
-              if window.location.hash === '#/active'
-                for todo in it
-                  if todo.done
-                    document.getElementById(`todo-${todo.id}`) then if it remove it end
-                  else
-                    document.getElementById(`todo-${todo.id}`) then
-                    if it === null
-                      htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target:'.todo-list', swap:'beforeend'})
-                    end
-                  end
-                end
-              else if window.location.hash === '#/completed'
-                for todo in it
-                  if todo.done
-                    document.getElementById(`todo-${todo.id}`) then
-                    if it === null
-                      htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target:'.todo-list', swap:'beforeend'})
-                    end
-                  else
-                    document.getElementById(`todo-${todo.id}`) then if it remove it end
-                  end
-                end
-              else
-                // loop through the JSON
-                for todo in it
-                  // check if the element exist in the current DOM, add if none
-                  // placement is decided according to order if there's an element
-                  // with higher than the current todo swap as 'beforebegin'
-
-                  for el in $todo.children
-                    if parseInt(el.id.slice(5)) > todo.id and document.getElementById(`todo-${todo.id}`) === null
-                      htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target: `#${el.id}`, swap:'beforebegin'})
-                    end
-                  end
-
-                  // do reverse lookup for lower than the current todo swap as 'afterend'
-                  for el in Array.from($todo.children).reverse()
-                    if parseInt(el.id.slice(5)) < todo.id and document.getElementById(`todo-${todo.id}`) === null
-                      htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target: `#${el.id}`, swap:'afterend'})
-                    end
-                  end
-
-                  // if todo is empty initially recursively add all of it
-                  if $todo.children.length === 0
-                    htmx.ajax('GET', `/todo-item?id=${todo.id}`, {target:'.todo-list', swap:'beforeend'})
-                  end
-                end
-            "
+          install ToggleMain
+          install ToggleFooter
+          install ToggleShow
+        "
       >
         <header class="header">
           <h1>todos</h1>
@@ -278,25 +157,7 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
             name="title"
             class="new-todo"
             placeholder="What needs to be done?"
-            _="
-              on load send focus to me
-              on focus
-                if $focus === undefined
-                  my.focus()
-                  set $isFocus to 'true'
-              end
-              on blur set $isFocus to undefined
-              on keyup[keyCode==13]
-                if $todo
-                  htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.todo-list', swap:'beforeend'})
-                  set my value to ''
-                else
-                  htmx.ajax('GET', `/add-todo?title=${my.value}`, {target:'.header', swap:'beforeend'})
-                  set my value to ''
-                end
-                  send toggleMain to <section.todoapp/>
-                  send toggleFooter to <section.todoapp/>
-            "
+            _="install AddTodo"
           />
         </header>
         @toggleMain(todos, checked)
@@ -319,41 +180,5 @@ templ Page(todos []Todo, filters []Filter, checked bool, hasCompleted bool, sele
     <script src="https://unpkg.com/todomvc-common@1.0.5/base.js" />
     <script src="https://unpkg.com/htmx.org@1.9.10" />
     <script src="https://unpkg.com/hyperscript.org/dist/_hyperscript.js" />
-    <script type="text/hyperscript">
-      def startMeUp()
-        log "
-     ooooo   ooooo ooooooooooooo ooo        ooooo ooooooo  ooooo 
-     `888'   `888' 8'   888   `8 `88.       .888'  `8888    d8'  
-      888     888       888       888b     d'888     Y888..8P    
-      888ooooo888       888       8 Y88. .P  888      `8888'     
-      888     888       888       8  `888'   888     .8PY888.    
-      888     888       888       8    Y     888    d8'  `888b   
-     o888o   o888o     o888o     o8o        o888o o888o  o88888o
-    ===========================================================
-            Build with GO, TEMPL, HTMX & _HYPERSCRIPT
-   _   _                 _       _     _                         
-  | |_| |__   ___   _ __(_) __ _| |__ | |_  __      ____ _ _   _ 
-  | __| '_ \\ / _ \\ | '__| |/ _\` | '_ \\| __| \\ \\ /\\ / / _\` | | | |
-  | |_| | | |  __/ | |  | | (_| | | | | |_   \\ V  V / (_| | |_| |
-   \\__|_| |_|\\___| |_|  |_|\\__, |_| |_|\\__|   \\_/\\_/ \\__,_|\\__, |
-                           |___/                           |___/ 
-                  by http://github.com/syarul/"
-      end
-      def hashCache()
-        // this is done to get current location hash then update todo-list and footer
-        set $initial to window.location.hash.slice(2).charAt(0).toUpperCase()
-        set $after to window.location.hash.slice(3)
-        fetch `/set-hash?name=${$initial}${$after}` then
-          send show to <section.todoapp/>
-          send toggleFooter to <section.todoapp/>
-      end
-      // this to handle popstate event such as back/forward button
-      // where it will automatically calling hashCache _hyperscript function
-      js
-        window.addEventListener('popstate', function(){
-          hashCache();
-        });
-      end
-    </script>
   </html>
 }
