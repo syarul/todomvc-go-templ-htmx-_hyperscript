@@ -95,7 +95,7 @@ func main() {
 	http.Handle("/set-hash", http.HandlerFunc(setHash))
 	http.Handle("/learn.json", http.HandlerFunc(learnHandler))
 
-	http.Handle("/update-counts", http.HandlerFunc(t.updateCounts))
+	http.Handle("/update-count", http.HandlerFunc(t.updateCount))
 	http.Handle("/toggle-all", http.HandlerFunc(t.toggleAllHandler))
 	http.Handle("/completed", http.HandlerFunc(t.clearCompleted))
 	http.Handle("/footer", http.HandlerFunc(t.footerHandler))
@@ -346,7 +346,7 @@ func (t *todos) clearCompleted(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *todos) updateCounts(w http.ResponseWriter, r *http.Request) {
+func (t *todos) updateCount(w http.ResponseWriter, r *http.Request) {
 	uncompletedCount := countNotDone(*t)
 	plural := ""
 	if uncompletedCount != 1 {

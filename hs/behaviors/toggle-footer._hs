@@ -15,10 +15,12 @@ behavior ToggleFooter
             add .selected to filter.firstChild
           else if filter.textContent !== `${$initial}${$after}`
             remove .selected from filter.firstChild
+          else
+            add .selected to filter.firstChild
           end
         end
-        -- update counts
-        fetch /update-counts then put the result into <span.todo-count/>
+        -- update count
+        fetch /update-count then put the result into <span.todo-count/>
     else
       htmx.ajax('GET', '/footer', {target:'.header', swap:'beforeend'})
     end
