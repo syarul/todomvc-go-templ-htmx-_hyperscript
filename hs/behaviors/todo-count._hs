@@ -1,4 +1,4 @@
 behavior TodoCount
   on load send todoCount to me
   on todoCount debounced at 100ms
-    fetch /update-counts then put the result into me
+    fetch /update-count then put the result into me
